@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Tally</title>
+
+<!-- ============================================================
+     TALLY — teacher tapping app
+     ------------------------------------------------------------
+     SETUP (3 steps, one time):
+     1. Paste your anon key below (Supabase Dashboard >
+        Project Settings > API > Project API keys > "anon public").
+        It is SAFE to expose — your RLS policies do the protecting.
+     2. Create your login: Dashboard > Authentication > Users >
+        Add user > your email + a password (this auto-confirms it).
+     3. Open this file (or commit it to a repo for GitHub Pages),
+        sign in, hit the gear to add your sections + paste rosters,
+        then tap.
+     ============================================================ -->
+<script>
+  const SUPABASE_URL      = "https://rfhdonhjlpqhltipefdt.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmaGRvbmhqbHBxaGx0aXBlZmR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTI0NTEsImV4cCI6MjA5NzQ2ODQ1MX0.hO5hQ8iQpn7T8gWJbiwOrRomzKeJ8sI4rKVwp8s-V6o";
+  // Where the student page will live (set this once it's hosted; only used to build copy-able links):
+  const STUDENT_PAGE_URL  = "https://your-tally-site/student.html";
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --cream:#F5F1E8; --card-cream:#EFE9DC;
+    --ink:#23262b; --muted:#8c8475; --line:#e0d9c9;
+    --blue:#2e6da4; --blue-deep:#1f5384;
+    --tile:#c8dcef; --tile-edge:#aac6e6; --tile-ink:#1d3a55;
+    --gold:#caa12f; --silver:#9aa3ab; --bronze:#b07a52;
+    --bad:#b0492f; --ok:#3f7d52;
+    --shadow:0 1px 2px rgba(40,35,25,.06),0 6px 18px rgba(40,35,25,.05);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; background:var(--cream); color:var(--ink);
+    font-family:Inter,system-ui,sans-serif; -webkit-font-smoothing:antialiased}
+  body{padding:0 0 88px; max-width:720px; margin:0 auto}
+  .serif{font-family:Fraunces,Georgia,serif}
+  .eyebrow{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+  .hidden{display:none !important}
+
+  /* top bar */
+  header.bar{display:flex; align-items:center; justify-content:space-between;
+    padding:18px 20px 10px; position:sticky; top:0; background:var(--cream); z-index:20}
+  .wordmark{font-size:30px; font-weight:700; letter-spacing:-.01em}
+  .wordmark .dot{color:var(--blue)}
+  .iconbtn{width:38px; height:38px; border-radius:10px; display:grid; place-items:center;
+    color:var(--muted); font-size:18px}
+  .iconbtn:hover{background:var(--card-cream); color:var(--ink)}
+
+  /* cycle bar */
+  .cyclebar{display:flex; align-items:center; justify-content:space-between;
+    padding:4px 20px 12px; gap:10px}
+  .cyclebar .label{font-weight:600; font-size:15px}
+  .cyclebar .dates{color:var(--muted); font-size:12px; margin-top:1px}
+  .cyclemenu{display:flex; gap:6px}
+  .pillbtn{border:1px solid var(--line); background:#fff; border-radius:999px;
+    padding:7px 12px; font-size:12.5px; font-weight:600; color:var(--ink)}
+  .pillbtn:hover{border-color:var(--blue); color:var(--blue)}
+  .pillbtn.go{background:var(--blue); color:#fff; border-color:var(--blue)}
+
+  /* tabs */
+  .tabs{display:flex; gap:8px; overflow-x:auto; padding:4px 20px 14px; scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto; border:1px solid var(--line); background:#fff; border-radius:999px;
+    padding:9px 15px; display:flex; align-items:center; gap:8px; white-space:nowrap}
+  .tab .dot{width:8px; height:8px; border-radius:50%; background:var(--tile-edge)}
+  .tab .pname{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  .tab.active{background:var(--blue); border-color:var(--blue)}
+  .tab.active .pname{color:#cfe0f3}
+  .tab.active .dot{background:#fff}
+
+  /* stat strip */
+  .stats{display:flex; align-items:flex-start; gap:22px; padding:2px 20px 16px; flex-wrap:wrap}
+  .stat .n{font-size:26px; font-weight:600; line-height:1}
+  .stat .n.blue{color:var(--blue)}
+  .stat .k{margin-top:5px}
+  .top3{margin-left:auto; min-width:150px}
+  .top3 .row{display:flex; align-items:center; gap:8px; font-size:13px; margin-top:4px}
+  .medal{width:18px; height:18px; border-radius:50%; color:#fff; font-size:10px; font-weight:700;
+    display:grid; place-items:center; flex:0 0 auto}
+  .m1{background:var(--gold)} .m2{background:var(--silver)} .m3{background:var(--bronze)}
+  .top3 .row b{margin-left:auto; font-weight:600}
+  .top3 .nm{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px}
+
+  /* grid */
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding:0 20px}
+  @media(min-width:560px){ .grid{grid-template-columns:repeat(3,1fr)} }
+  .card{background:var(--tile); border:1px solid var(--tile-edge); border-radius:14px;
+    padding:13px 14px; display:flex; align-items:flex-end; justify-content:space-between;
+    user-select:none; touch-action:manipulation; transition:transform .08s ease, filter .08s ease;
+    min-height:74px}
+  .card:active{transform:scale(.97)}
+  .card.bump{animation:bump .28s ease}
+  @keyframes bump{0%{filter:brightness(1)}30%{filter:brightness(1.12)}100%{filter:brightness(1)}}
+  .card .who{min-width:0}
+  .card .last{font-weight:600; font-size:16px; color:var(--tile-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .card .first{font-size:12px; color:#4d6a85; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .card .score{font-size:26px; font-weight:600; color:var(--tile-ink); line-height:1; padding-left:6px}
+
+  /* footer dock */
+  .dock{position:fixed; bottom:0; left:0; right:0; max-width:720px; margin:0 auto;
+    background:rgba(245,241,232,.94); backdrop-filter:blur(8px); border-top:1px solid var(--line);
+    padding:12px 20px calc(12px + env(safe-area-inset-bottom)); display:flex; align-items:center; gap:12px}
+  .dock .hint{font-size:12px; color:var(--muted)}
+  .dock .hint b{color:var(--ink); font-weight:600}
+  .dock .right{margin-left:auto; display:flex; gap:8px}
+
+  /* login + manage + modal */
+  .screen{padding:0 20px; max-width:420px; margin:8vh auto 0}
+  .screen .wordmark{font-size:44px; text-align:center; margin-bottom:6px}
+  .screen .sub{text-align:center; color:var(--muted); font-size:13px; margin-bottom:26px}
+  label.field{display:block; margin-bottom:14px}
+  label.field span{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px}
+  input,textarea,select{width:100%; font-family:inherit; font-size:15px; color:var(--ink);
+    background:#fff; border:1px solid var(--line); border-radius:11px; padding:12px 13px}
+  textarea{min-height:120px; resize:vertical; line-height:1.5}
+  input:focus,textarea:focus,select:focus{outline:none; border-color:var(--blue)}
+  .btn{display:block; width:100%; background:var(--blue); color:#fff; font-weight:600; font-size:15px;
+    border-radius:11px; padding:13px; margin-top:6px}
+  .btn:hover{background:var(--blue-deep)}
+  .btn.ghost{background:#fff; color:var(--ink); border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:var(--blue); color:var(--blue)}
+  .err{color:var(--bad); font-size:13px; margin-top:10px; text-align:center; min-height:18px}
+
+  .sheet{position:fixed; inset:0; background:rgba(35,30,20,.32); z-index:40; display:flex; align-items:flex-end; justify-content:center}
+  .sheet .panel{background:var(--cream); width:100%; max-width:720px; border-radius:20px 20px 0 0;
+    padding:22px 20px calc(22px + env(safe-area-inset-bottom)); max-height:90vh; overflow:auto}
+  .sheet.center{align-items:center}
+  .sheet.center .panel{border-radius:18px; max-width:360px; margin:0 16px}
+  .panel h2{font-family:Fraunces,serif; font-weight:600; font-size:22px; margin:0 0 4px}
+  .panel .lead{color:var(--muted); font-size:13px; margin:0 0 18px}
+  .panel h3{font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+    margin:22px 0 10px; border-top:1px solid var(--line); padding-top:18px}
+  .roster-item{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px}
+  .roster-item .tok{margin-left:auto; font-size:11px; color:var(--blue); font-weight:600}
+  .seclist .pillbtn{margin:0 6px 6px 0}
+  .closebar{display:flex; justify-content:flex-end; margin-top:18px}
+  .dngr{color:#a63a2e !important; border-color:#e5c4bf !important}
+  .btn.ghost.dngr:hover{border-color:#a63a2e !important}
+
+  /* toast */
+  #toast{position:fixed; left:50%; bottom:104px; transform:translateX(-50%);
+    background:var(--ink); color:#fff; font-size:13px; padding:10px 16px; border-radius:999px;
+    opacity:0; transition:opacity .2s; z-index:60; pointer-events:none; max-width:88vw; text-align:center}
+  #toast.show{opacity:1}
+
+  .empty{text-align:center; color:var(--muted); padding:48px 24px; font-size:14px; line-height:1.6}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="login" class="screen hidden">
+  <div class="wordmark serif">Tally<span class="dot">.</span></div>
+  <div class="sub">Participation, minus the abacus.</div>
+  <label class="field"><span>Email</span><input id="email" type="email" autocomplete="username"></label>
+  <label class="field"><span>Password</span><input id="password" type="password" autocomplete="current-password"></label>
+  <button class="btn" id="signin">Sign in</button>
+  <div class="err" id="loginErr"></div>
+</section>
+
+<!-- SETUP NOTICE (anon key not set) -->
+<section id="setup" class="screen hidden">
+  <div class="wordmark serif">Tally<span class="dot">.</span></div>
+  <div class="sub" style="margin-top:18px; line-height:1.6">
+    Almost there. Open this file and paste your Supabase <b>anon public key</b>
+    into <code>SUPABASE_ANON_KEY</code> near the top, then reload.
+    <br><br>It's in the dashboard under Project Settings → API.
+  </div>
+</section>
+
+<!-- MAIN -->
+<main id="app" class="hidden">
+  <header class="bar">
+    <div class="wordmark serif">Tally<span class="dot">.</span></div>
+    <div style="display:flex; gap:4px">
+      <button class="iconbtn" id="manageBtn" title="Roster &amp; cycles">⚙</button>
+      <button class="iconbtn" id="signout" title="Sign out">⎋</button>
+    </div>
+  </header>
+
+  <div class="cyclebar">
+    <div>
+      <div class="label serif" id="cycleLabel">No open cycle</div>
+      <div class="dates" id="cycleDates"></div>
+    </div>
+    <div class="cyclemenu">
+      <button class="pillbtn go" id="publishBtn" title="Push current numbers to student pages">Publish now</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty hidden" id="gridEmpty"></div>
+
+  <div class="dock">
+    <div class="hint">Tap <b>+1</b> · hold a card to <b>edit</b></div>
+    <div class="right">
+      <button class="pillbtn" id="csvBtn">Export CSV</button>
+      <button class="pillbtn" id="undoBtn">↺ Undo</button>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+/* ---------- boot ---------- */
+const KEY_SET = SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.startsWith("PASTE_");
+let sb = null;
+const $ = s => document.querySelector(s);
+const show = (id,on=true)=>$(id).classList.toggle("hidden",!on);
+
+const state = { user:null, sections:[], sectionId:null, cycle:null,
+                students:[], totals:{}, session:0 };
+
+const localDate = () => { const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),2200); }
+
+/* grade scale — mirrors compute_grade() in the database */
+function gradePct(pct){ if(pct==null||isNaN(pct)) return 0;
+  if(pct>=125) return 105; if(pct>=50) return Math.min(100,Math.round(pct));
+  return Math.round(pct*pct/50); }
+
+/* ---------- auth ---------- */
+async function start(){
+  if(!KEY_SET){ show("#setup"); return; }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ state.user=session.user; enterApp(); } else { show("#login"); }
+}
+$("#signin").onclick = async ()=>{
+  const email=$("#email").value.trim(), password=$("#password").value;
+  $("#loginErr").textContent="";
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ $("#loginErr").textContent=error.message; return; }
+  state.user=data.user; show("#login",false); enterApp();
+};
+$("#signout").onclick = async ()=>{ await sb.auth.signOut(); location.reload(); };
+
+async function enterApp(){ show("#app"); await loadAll(); }
+
+/* ---------- load ---------- */
+async function loadAll(){
+  const [{data:sections},{data:cycles}] = await Promise.all([
+    sb.from("sections").select("*").order("sort_order").order("period_number"),
+    sb.from("cycles").select("*").order("is_open",{ascending:false}).order("start_date",{ascending:false})
+  ]);
+  state.sections = sections||[];
+  state.cycle = (cycles||[]).find(c=>c.is_open) || (cycles||[])[0] || null;
+
+  if(!state.cycle){ renderNoCycle(); return; }
+
+  const { data:allStudents } = await sb.from("students").select("*")
+        .order("last_name").order("first_name");
+  state.students = (allStudents||[]).filter(s=>s.active);
+  state.inactive = (allStudents||[]).filter(s=>!s.active);
+
+  const { data:taps } = await sb.from("taps").select("student_id,points").eq("cycle_id",state.cycle.id);
+  state.totals = {}; (taps||[]).forEach(t=> state.totals[t.student_id]=(state.totals[t.student_id]||0)+t.points);
+
+  if(!state.sectionId || !state.sections.find(s=>s.id===state.sectionId))
+    state.sectionId = state.sections[0]?.id || null;
+
+  renderCycle(); renderTabs(); renderSection();
+}
+
+/* ---------- derived ---------- */
+const sectionStudents = id => state.students.filter(s=>s.section_id===id);
+const tot = id => state.totals[id]||0;
+function mean(list){ if(!list.length) return null; return list.reduce((a,s)=>a+tot(s.id),0)/list.length; }
+function pooledAvg(){ return mean(state.students); }
+
+/* ---------- render ---------- */
+function renderCycle(){
+  $("#cycleLabel").textContent = state.cycle.label;
+  const fmt = d => d ? new Date(d+"T00:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"}) : "open";
+  $("#cycleDates").textContent = `${fmt(state.cycle.start_date)} – ${fmt(state.cycle.end_date)}`;
+}
+function renderNoCycle(){
+  renderTabs(); $("#stats").innerHTML=""; $("#grid").innerHTML="";
+  $("#cycleLabel").textContent="No open cycle"; $("#cycleDates").textContent="";
+  show("#gridEmpty"); $("#gridEmpty").innerHTML="No open cycle yet.<br>Open the gear ⚙ and start one.";
+}
+function renderTabs(){
+  const t=$("#tabs"); t.innerHTML="";
+  state.sections.forEach(s=>{
+    const b=document.createElement("button");
+    b.className="tab"+(s.id===state.sectionId?" active":"");
+    b.innerHTML=`<span class="dot"></span><span class="pname">${esc(s.label)}</span>`;
+    b.onclick=()=>{ state.sectionId=s.id; renderTabs(); renderSection(); };
+    t.appendChild(b);
+  });
+}
+function renderSection(){
+  if(!state.sectionId){ $("#grid").innerHTML=""; $("#stats").innerHTML="";
+    show("#gridEmpty"); $("#gridEmpty").innerHTML="No sections yet.<br>Open the gear ⚙ to add your periods and rosters."; return; }
+  show("#gridEmpty",false);
+  renderStats(); renderGrid();
+}
+function renderStats(){
+  const kids=sectionStudents(state.sectionId);
+  const avg=mean(kids);
+  const ranked=[...kids].sort((a,b)=>tot(b.id)-tot(a.id)).slice(0,3);
+  const medals=["m1","m2","m3"];
+  $("#stats").innerHTML = `
+    <div class="stat"><div class="n serif">${avg==null?"–":avg.toFixed(1)}</div><div class="k eyebrow">Class avg</div></div>
+    <div class="stat"><div class="n serif">${kids.length}</div><div class="k eyebrow">Students</div></div>
+    <div class="stat"><div class="n serif blue">+${state.session}</div><div class="k eyebrow">Session</div></div>
+    <div class="top3">
+      <div class="eyebrow">Top 3 ★</div>
+      ${ranked.map((s,i)=>`<div class="row"><span class="medal ${medals[i]}">${i+1}</span>
+        <span class="nm">${esc(s.first_name)}</span><b>${tot(s.id)}</b></div>`).join("") || '<div class="row" style="color:var(--muted)">—</div>'}
+    </div>`;
+}
+function renderGrid(){
+  const kids=sectionStudents(state.sectionId);
+  const g=$("#grid"); g.innerHTML="";
+  if(!kids.length){ show("#gridEmpty"); $("#gridEmpty").innerHTML="No students in this period yet.<br>Add them under the gear ⚙."; return; }
+  show("#gridEmpty",false);
+  kids.forEach(s=>{
+    const c=document.createElement("div"); c.className="card"; c.dataset.id=s.id;
+    c.innerHTML=`<div class="who"><div class="last">${esc(s.last_name)}</div><div class="first">${esc(s.first_name)}</div></div>
+                 <div class="score">${tot(s.id)}</div>`;
+    bindCard(c,s); g.appendChild(c);
+  });
+}
+
+/* ---------- tap / hold / undo ---------- */
+function bindCard(card,s){
+  let timer=null, held=false;
+  const down=()=>{ held=false; timer=setTimeout(()=>{ held=true; editStudent(s); },450); };
+  const up=()=>{ clearTimeout(timer); if(!held) tap(s,card); };
+  const cancel=()=>clearTimeout(timer);
+  card.addEventListener("pointerdown",down);
+  card.addEventListener("pointerup",up);
+  card.addEventListener("pointerleave",cancel);
+  card.addEventListener("pointercancel",cancel);
+  card.addEventListener("contextmenu",e=>e.preventDefault());
+}
+async function tap(s,card){
+  state.totals[s.id]=tot(s.id)+1; state.session++;
+  card.querySelector(".score").textContent=tot(s.id);
+  card.classList.remove("bump"); void card.offsetWidth; card.classList.add("bump");
+  renderStats();
+  const { error } = await sb.from("taps").insert({ student_id:s.id, cycle_id:state.cycle.id, tap_date:localDate(), points:1 });
+  if(error){ state.totals[s.id]=tot(s.id)-1; state.session--; renderSection(); toast("Couldn't save that tap — "+error.message); }
+}
+function editStudent(s){
+  const cur=tot(s.id);
+  const sheet=document.createElement("div"); sheet.className="sheet center";
+  sheet.innerHTML=`<div class="panel">
+    <h2>${esc(s.first_name)} ${esc(s.last_name)}</h2>
+    <p class="lead">Edit this student.</p>
+    <label class="field"><span>Total points this cycle</span><input id="edPts" type="number" min="0" value="${cur}"></label>
+    <label class="field"><span>First name</span><input id="edFirst" value="${esc(s.first_name)}"></label>
+    <label class="field"><span>Last name</span><input id="edLast" value="${esc(s.last_name)}"></label>
+    <button class="btn" id="edSave">Save</button>
+    <button class="btn ghost dngr" id="edDeact">Deactivate (hide, keep history)</button>
+    <div class="closebar"><button class="pillbtn" id="edClose">Cancel</button></div>
+  </div>`;
+  document.body.appendChild(sheet);
+  sheet.addEventListener("click",e=>{ if(e.target===sheet) sheet.remove(); });
+  sheet.querySelector("#edClose").onclick=()=>sheet.remove();
+
+  sheet.querySelector("#edSave").onclick=async()=>{
+    const n=Math.max(0,Math.round(Number(sheet.querySelector("#edPts").value)));
+    const first=sheet.querySelector("#edFirst").value.trim();
+    const last=sheet.querySelector("#edLast").value.trim();
+    if(isNaN(n)){ toast("Points must be a number."); return; }
+    if(!first||!last){ toast("Name can't be blank."); return; }
+    if(first!==s.first_name || last!==s.last_name){
+      const { error }=await sb.from("students").update({ first_name:first, last_name:last }).eq("id",s.id);
+      if(error){ toast("Rename failed — "+error.message); return; }
+    }
+    if(n!==cur){
+      const { error:delErr }=await sb.from("taps").delete().eq("student_id",s.id).eq("cycle_id",state.cycle.id);
+      if(delErr){ toast("Edit failed — "+delErr.message); return; }
+      if(n>0){ await sb.from("taps").insert({ student_id:s.id, cycle_id:state.cycle.id, tap_date:localDate(), points:n }); }
+    }
+    sheet.remove(); await loadAll(); toast(`${first} saved.`);
+  };
+
+  let armed=false;
+  const deactBtn=sheet.querySelector("#edDeact");
+  deactBtn.onclick=async()=>{
+    if(!armed){ armed=true; deactBtn.textContent="Tap again to deactivate"; return; }
+    const { error }=await sb.from("students").update({ active:false }).eq("id",s.id);
+    if(error){ toast("Couldn't deactivate — "+error.message); return; }
+    sheet.remove(); await loadAll();
+    toast(`${s.first_name} deactivated. Restore under ⚙ → Inactive students.`);
+  };
+}
+$("#undoBtn").onclick = async ()=>{
+  const { data:last } = await sb.from("taps").select("id,student_id,points")
+        .eq("cycle_id",state.cycle.id).order("created_at",{ascending:false}).limit(1);
+  if(!last||!last.length){ toast("Nothing to undo."); return; }
+  const row=last[0];
+  await sb.from("taps").delete().eq("id",row.id);
+  state.totals[row.student_id]=Math.max(0,tot(row.student_id)-row.points);
+  if(state.session>0) state.session--;
+  renderSection(); toast("Last entry removed.");
+};
+
+/* ---------- cycle actions ---------- */
+$("#publishBtn").onclick = async ()=>{
+  if(!state.cycle) return;
+  const { error } = await sb.rpc("refresh_published",{ p_cycle:state.cycle.id });
+  toast(error ? "Publish failed — "+error.message : "Published — student pages updated.");
+};
+
+/* ---------- CSV ---------- */
+$("#csvBtn").onclick = ()=>{
+  if(!state.sectionId) return;
+  const sec=state.sections.find(s=>s.id===state.sectionId);
+  const avg=pooledAvg();
+  const kids=[...sectionStudents(state.sectionId)].sort((a,b)=>a.last_name.localeCompare(b.last_name));
+  const rows=[["Last","First","Points","Grade"]];
+  kids.forEach(s=>{ const g = avg ? gradePct(tot(s.id)/avg*100) : 0;
+    rows.push([s.last_name,s.first_name,tot(s.id),g]); });
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const url=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  const a=document.createElement("a"); a.href=url;
+  a.download=`tally_${(sec?.label||"section").replace(/\s+/g,"_")}_${state.cycle.label.replace(/\s+/g,"_")}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+};
+
+/* ---------- manage sheet (roster + cycles) ---------- */
+function esc(x){ return String(x??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+
+$("#manageBtn").onclick = openManage;
+function openManage(){
+  const secOpts = state.sections.map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join("");
+  const rosterRows = state.students.map(s=>{
+    const link=`${STUDENT_PAGE_URL}?t=${s.access_token}`;
+    return `<div class="roster-item"><span>${esc(s.last_name)}, ${esc(s.first_name)}</span>
+      <button class="tok" data-link="${esc(link)}">copy link</button></div>`;
+  }).join("") || '<div class="lead">No students yet.</div>';
+
+  const sheet=document.createElement("div"); sheet.className="sheet";
+  sheet.innerHTML=`<div class="panel">
+    <h2>Roster &amp; cycles</h2>
+    <p class="lead">Set up your periods and students once. Tokens generate automatically.</p>
+
+    <h3>Cycle</h3>
+    <div class="lead" style="margin-bottom:10px">Current: <b>${state.cycle?esc(state.cycle.label):"none"}</b></div>
+    <div class="seclist">
+      <button class="pillbtn" id="newCycle">Start new cycle</button>
+      ${state.cycle?'<button class="pillbtn" id="closeCycle">Close current cycle</button>':""}
+    </div>
+
+    <h3>Periods <span style="font-weight:400;text-transform:none;letter-spacing:0">— tap one to rename or delete</span></h3>
+    <div class="seclist" style="margin-bottom:12px">
+      ${state.sections.map(s=>`<button class="pillbtn secedit" data-sid="${s.id}">${esc(s.label)}</button>`).join("")||'<span class="lead">None yet.</span>'}
+    </div>
+    <label class="field"><span>Add a period</span><input id="secLabel" placeholder="e.g. Period 1"></label>
+    <button class="btn ghost" id="addSec">Add period</button>
+
+    <h3>Students</h3>
+    <label class="field"><span>Add to period</span><select id="secPick">${secOpts}</select></label>
+    <label class="field"><span>Paste names — one per line (First Last)</span>
+      <textarea id="names" placeholder="Zoe Adler&#10;Marcus Bell&#10;Ava Bui"></textarea></label>
+    <button class="btn ghost" id="addKids">Add students</button>
+
+    <h3>Student links</h3>
+    ${rosterRows}
+
+    ${state.inactive?.length ? `<h3>Inactive students</h3>
+    ${state.inactive.map(s=>`<div class="roster-item"><span style="color:var(--muted)">${esc(s.last_name)}, ${esc(s.first_name)}</span>
+      <button class="tok" data-restore="${s.id}">restore</button>
+      <button class="tok dngr" data-nuke="${s.id}">delete forever</button></div>`).join("")}` : ""}
+
+    <div class="closebar"><button class="pillbtn" id="closeSheet">Done</button></div>
+  </div>`;
+  document.body.appendChild(sheet);
+  sheet.addEventListener("click",e=>{ if(e.target===sheet) sheet.remove(); });
+  sheet.querySelector("#closeSheet").onclick=()=>sheet.remove();
+
+  sheet.querySelector("#addSec").onclick=async()=>{
+    const label=sheet.querySelector("#secLabel").value.trim(); if(!label) return;
+    const { error }=await sb.from("sections").insert({ label, sort_order:state.sections.length });
+    if(error){ toast(error.message); return; }
+    await loadAll(); sheet.remove(); openManage(); toast(`Added ${label}.`);
+  };
+  sheet.querySelector("#addKids").onclick=async()=>{
+    const sid=sheet.querySelector("#secPick").value;
+    const lines=sheet.querySelector("#names").value.split("\n").map(l=>l.trim()).filter(Boolean);
+    if(!sid||!lines.length){ toast("Pick a period and paste some names."); return; }
+    const rows=lines.map(line=>{ const parts=line.split(/\s+/);
+      const last=parts.length>1?parts.pop():""; return { section_id:sid, first_name:parts.join(" "), last_name:last }; });
+    const { error }=await sb.from("students").insert(rows);
+    if(error){ toast(error.message); return; }
+    await loadAll(); sheet.remove(); openManage(); toast(`Added ${rows.length} students.`);
+  };
+  sheet.querySelectorAll(".tok[data-link]").forEach(b=> b.onclick=()=>{
+    navigator.clipboard?.writeText(b.dataset.link); toast("Link copied."); });
+
+  sheet.querySelectorAll("[data-restore]").forEach(b=> b.onclick=async()=>{
+    const { error }=await sb.from("students").update({ active:true }).eq("id",b.dataset.restore);
+    if(error){ toast(error.message); return; }
+    await loadAll(); sheet.remove(); openManage(); toast("Restored.");
+  });
+  sheet.querySelectorAll("[data-nuke]").forEach(b=> b.onclick=async()=>{
+    if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="tap again — erases all their data"; return; }
+    const { error }=await sb.from("students").delete().eq("id",b.dataset.nuke);
+    if(error){ toast(error.message); return; }
+    await loadAll(); sheet.remove(); openManage(); toast("Deleted forever.");
+  });
+
+  sheet.querySelectorAll(".secedit").forEach(b=> b.onclick=()=>{
+    const sec=state.sections.find(x=>x.id===b.dataset.sid); if(!sec) return;
+    const sub=document.createElement("div"); sub.className="sheet center";
+    const kidCount=state.students.filter(x=>x.section_id===sec.id).length + (state.inactive||[]).filter(x=>x.section_id===sec.id).length;
+    sub.innerHTML=`<div class="panel">
+      <h2>${esc(sec.label)}</h2>
+      <p class="lead">Rename or delete this period.</p>
+      <label class="field"><span>Period name</span><input id="spLabel" value="${esc(sec.label)}"></label>
+      <button class="btn" id="spSave">Save name</button>
+      <button class="btn ghost dngr" id="spDel">Delete period</button>
+      <div class="closebar"><button class="pillbtn" id="spClose">Cancel</button></div>
+    </div>`;
+    document.body.appendChild(sub);
+    sub.addEventListener("click",e=>{ if(e.target===sub) sub.remove(); });
+    sub.querySelector("#spClose").onclick=()=>sub.remove();
+    sub.querySelector("#spSave").onclick=async()=>{
+      const label=sub.querySelector("#spLabel").value.trim(); if(!label) return;
+      const { error }=await sb.from("sections").update({ label }).eq("id",sec.id);
+      if(error){ toast(error.message); return; }
+      sub.remove(); await loadAll(); sheet.remove(); openManage(); toast("Renamed.");
+    };
+    let armed=false;
+    const delBtn=sub.querySelector("#spDel");
+    delBtn.onclick=async()=>{
+      if(!armed){ armed=true;
+        delBtn.textContent=`Tap again — deletes ${kidCount} student${kidCount===1?"":"s"} and ALL their data`; return; }
+      const { error }=await sb.from("sections").delete().eq("id",sec.id);
+      if(error){ toast(error.message); return; }
+      if(state.sectionId===sec.id) state.sectionId=null;
+      sub.remove(); await loadAll(); sheet.remove(); openManage(); toast("Period deleted.");
+    };
+  });
+  if(sheet.querySelector("#newCycle")) sheet.querySelector("#newCycle").onclick=async()=>{
+    const label=prompt("Name the new cycle:", `Cycle ${ (state.cycle? (parseInt(state.cycle.label.replace(/\D/g,""))||0):0)+1 }`);
+    if(!label) return;
+    await sb.from("cycles").update({ is_open:false }).eq("is_open",true);
+    const { error }=await sb.from("cycles").insert({ label, is_open:true });
+    if(error){ toast(error.message); return; }
+    state.sectionId=null; await loadAll(); sheet.remove(); toast(`${label} started.`);
+  };
+  if(sheet.querySelector("#closeCycle")) sheet.querySelector("#closeCycle").onclick=async()=>{
+    if(!confirm("Close this cycle? You can still publish it, but new taps stop counting toward it.")) return;
+    await sb.from("cycles").update({ is_open:false, end_date:localDate() }).eq("id",state.cycle.id);
+    await sb.rpc("refresh_published",{ p_cycle:state.cycle.id });
+    await loadAll(); sheet.remove(); toast("Cycle closed & published.");
+  };
+}
+
+start();
+</script>
+</body>
+</html>
